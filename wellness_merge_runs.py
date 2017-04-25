@@ -5,6 +5,7 @@ __doc__ = """Merge sequencing runs to form complete samples."""
 
 
 from sys import argv, exit
+from os import path
 from collections import namedtuple
 import argparse
 
@@ -43,7 +44,11 @@ def parse_filenames(filenames):
     Fastq_file = namedtuple("FASTQ_file", "filename barcode lane date flowcell index read")
 
     for fn in filenames:
-        _, barcode, lane, date, flowcell, _, index, read = fn.split("_")
+        basename = path.basename(fn)
+        try:
+            _, barcode, lane, date, flowcell, _, index, read = basename.split("_")
+        except ValueError:
+            print("ERROR: cannot split %s", basename)
         yield Fastq_file(fn, int(barcode), int(lane), date, flowcell, index, int(read[0]))
 
 
