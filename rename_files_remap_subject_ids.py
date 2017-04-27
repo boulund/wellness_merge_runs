@@ -5,7 +5,7 @@ __doc__ = """Rename sample files according to remap table."""
 
 
 from sys import argv, exit
-from os import path, rename
+from os import path, rename, mkdir
 from collections import namedtuple
 import argparse
 
@@ -23,6 +23,8 @@ def parse_args():
             help="FILEs to process.")
     parser.add_argument("-r", "--remap", 
             help="CSV with subject IDs to remap. Three columns: subject_visit, subject_incorrect, subject_correct")
+    parser.add_argument("-o", "--outdir", required=True,
+            help="output dir for all renamed files (required to avoid collisions during renaming).")
 
     if len(argv) < 2:
         parser.print_help()
@@ -54,7 +56,7 @@ def read_remap_table(remap_fn):
     return df.to_dict()["correct_id"]
 
 
-def main(fastq_files, remap_table):
+def main(fastq_files, remap_table, outdir):
     """Process all filenames and rename files according to remap table.
     """
 
@@ -65,11 +67,13 @@ def main(fastq_files, remap_table):
         if subject_visit in remap_dict:
             new_subject = str(remap_dict[filename[2]])
             new_fn = new_subject+"_"+filename[3]+filename[1][7:]
-            print(path.join(filename[0], filename[1]), "-->", path.join(filename[0], new_fn))
-            rename(path.join(filename[0], filename[1]), path.join(filename[0], new_fn))
+            print(path.join(filename[0], filename[1]), " -->", path.join(outdir, new_fn))
+            rename(path.join(filename[0], filename[1]), path.join(outdir, new_fn))
         else:
             print(filename[1], " --> No change")
 
 if __name__ == "__main__":
     options = parse_args()
-    main(options.FILE, options.remap)
+    if not path.exists(options.outdir):
+        mkdir(options.outdir)
+    main(options.FILE, options.remap, options.outdir)
