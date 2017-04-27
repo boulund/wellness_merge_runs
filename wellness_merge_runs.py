@@ -24,6 +24,8 @@ def parse_args():
     parser.add_argument("-s", "--sample-table", dest="sample_table",
             required=True,
             help="Sample database connecting barcode to individual and visit")
+    parser.add_argument("-r", "--remap", 
+            help="CSV file to remap individual IDs. Three columns: id_visit, id_old, id_new")
     parser.add_argument("-o", "--outdir", 
             default="merged_runs",
             help="Output directory to write merged files to.")
@@ -62,8 +64,17 @@ def read_sample_table(table_fn):
 
     return df[df["Sample type"] == "Faeces"]
 
+ 
+def read_remap_table(remap_fn):
+    """Read remap table into dataframe, return remapping dict.
+    """
 
-def create_new_filenames(files, samples):
+    df = pd.read_csv(remap_fn, index_col=0)
+
+    return df.to_dict()["correct_id"]
+
+
+def create_new_filenames(files, samples, remap_dict=None):
     """Identify what subject and visit each barcoded file corresponds to and create new filenames accordingly.
 
     Yields tuples of (old_filename, new_filename).
@@ -71,16 +82,26 @@ def create_new_filenames(files, samples):
     for fastq_file in files:
         subject_id, visit = samples.loc[fastq_file.barcode, ["Subject id", "Visit"]]
         visit_clean = visit[-1] 
-        yield fastq_file.filename, str(subject_id)+"_v"+str(visit_clean)+"_"+str(fastq_file.read)+".fastq.gz"
+        subject_id_visit = str(subject_id)+"_v"+str(visit_clean) 
+        if remap_dict and (subject_id_visit in remap_dict):
+            new_subject_id = str(remap_dict[subject_id_visit])
+            yield fastq_file.filename, new_subject_id+"_v"+str(visit_clean)+"_"+str(fastq_file.read)+".fastq.gz"
+        else: 
+            yield fastq_file.filename, str(subject_id)+"_v"+str(visit_clean)+"_"+str(fastq_file.read)+".fastq.gz"
 
-def main(fastq_files, sample_table, outdir):
+
+def main(fastq_files, sample_table, outdir, remap_table):
     """Process all filenames to determine what sample each file belongs to 
     and generate file merge commands.
     """
 
     files = list(parse_filenames(fastq_files))
     samples = read_sample_table(sample_table)
-    new_filenames = create_new_filenames(files, samples)
+    if remap_table:
+        remap_dict = read_remap_table(remap_table)
+        new_filenames = create_new_filenames(files, samples, remap_dict)
+    else:
+        new_filenames = create_new_filenames(files, samples)
 
     for old, new in new_filenames:
         print(f"cat {old} >> {outdir}/{new}")
@@ -88,4 +109,4 @@ def main(fastq_files, sample_table, outdir):
 
 if __name__ == "__main__":
     options = parse_args()
-    main(options.FASTQ, options.sample_table, options.outdir)
+    main(options.FASTQ, options.sample_table, options.outdir, options.remap)
