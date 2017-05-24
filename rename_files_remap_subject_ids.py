@@ -53,13 +53,15 @@ def parse_filenames(filenames):
         yield dirname, basename, subject_visit, visit
 
  
-def read_remap_table(remap_fn):
+def read_remap_table(remap_fn, reverse):
     """Read remap table into dataframe, return remapping dict.
     """
 
     df = pd.read_csv(remap_fn, index_col=0)
-
-    return df.to_dict()["correct_id"]
+    d = df.to_dict()["correct_id"]
+    if reverse:
+        d = {str(v)+k[-3:]: k[0:4] for k, v in d.items()}
+    return d
 
 
 def main(fastq_files, remap_table, outdir, reverse, link, dryrun):
@@ -67,15 +69,14 @@ def main(fastq_files, remap_table, outdir, reverse, link, dryrun):
     """
 
     files = parse_filenames(fastq_files)
-    remap_dict = read_remap_table(remap_table)
+    remap_dict = read_remap_table(remap_table, reverse)
+    print(remap_dict)
     for filename in files:
         subject_visit = filename[2]
         if subject_visit in remap_dict:
             new_subject = str(remap_dict[filename[2]])
             new_fn = new_subject+"_"+filename[3]+filename[1][7:]
             old_fn = path.join(filename[0], filename[1])
-            if reverse:
-                new_fn, old_fn = old_fn, new_fn
             print(old_fn, " -->", path.join(outdir, new_fn))
             if not dryrun:
                 if link:
