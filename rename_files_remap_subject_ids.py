@@ -25,6 +25,12 @@ def parse_args():
             help="CSV with subject IDs to remap. Three columns: subject_visit, subject_incorrect, subject_correct")
     parser.add_argument("-o", "--outdir", required=True,
             help="output dir for all renamed files (required to avoid collisions during renaming).")
+    parser.add_argument("--reverse", action="store_true",
+            help="Reverse the mapping [%(default)s].")
+    parser.add_argument("-l", "--link", action="store_true",
+            help="Create symlinks instead of copying [%(default)s].")
+    parser.add_argument("-d", "--dryrun", action="store_false",
+            help="Only print planned actions. Don't rename any files [%(default)s].")
 
     if len(argv) < 2:
         parser.print_help()
@@ -56,7 +62,7 @@ def read_remap_table(remap_fn):
     return df.to_dict()["correct_id"]
 
 
-def main(fastq_files, remap_table, outdir):
+def main(fastq_files, remap_table, outdir, reverse, link, dryrun):
     """Process all filenames and rename files according to remap table.
     """
 
@@ -67,8 +73,15 @@ def main(fastq_files, remap_table, outdir):
         if subject_visit in remap_dict:
             new_subject = str(remap_dict[filename[2]])
             new_fn = new_subject+"_"+filename[3]+filename[1][7:]
-            print(path.join(filename[0], filename[1]), " -->", path.join(outdir, new_fn))
-            rename(path.join(filename[0], filename[1]), path.join(outdir, new_fn))
+            old_fn = path.join(filename[0], filename[1])
+            if reverse:
+                new_fn, old_fn = old_fn, new_fn
+            print(old_fn, " -->", path.join(outdir, new_fn))
+            if not dryrun:
+                if link:
+                    print("ln -s {} {}".format(old_fn, new_fn))
+                else:
+                    rename(old_fn, path.join(outdir, new_fn))
         else:
             print(filename[1], " --> No change")
 
@@ -76,4 +89,4 @@ if __name__ == "__main__":
     options = parse_args()
     if not path.exists(options.outdir):
         mkdir(options.outdir)
-    main(options.FILE, options.remap, options.outdir)
+    main(options.FILE, options.remap, options.outdir, options.reverse, options.link, options.dryrun)
