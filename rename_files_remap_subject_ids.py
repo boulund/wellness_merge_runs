@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 __author__ = "Fredrik Boulund"
 __date__ = "2017"
-__doc__ = """Rename sample files according to remap table.""" 
+__doc__ = """Rename V4 sample files according to remap table.""" 
 
 
 from sys import argv, exit
@@ -41,16 +41,37 @@ def parse_args():
 
 def parse_filenames(filenames):
     """Parse filenames.
-    Assumes 4 character subject_id and two character visit id (e.g. v1), for a
-    total of 7 characters comprising the sample name.
-    E.g. 4295_v4_1.fastq.gz and 4295_v4.statsfile.txt.gz.
+
+    The sample filenames are typically:
+
+        1.3250.V3_S34_L001_R1_001.fastq.gz
+
+    The first digit (1) is the same for all file names. 
+    The second part is the sample name (3250).
+    The third part is the visit (V3). 
+        NOTE: This is not present for v1 samples!!:
+        1.3264_S67_L001_R1_001.fastq.gz
+        Here it is missing, and no dot follows the sample name.
+    We are only interested in renaming V4 samples here anyway, so not an issue.
     """
    
     for fn in filenames:
         dirname, basename = path.split(fn)
-        subject_visit = basename[:7]
-        visit = basename[5:7]
-        yield dirname, basename, subject_visit, visit
+        try:
+            _, subject, visit = basename[:9].split(".")
+            subject = subject
+            if visit.startswith("fi"):
+                # Visit one files have no visit in filename!
+                visit = "V1"
+        except ValueError:
+            # This happens when there is no visit in the filename (i.e. visit1)
+            subject = basename[2:6]
+            visit = "V1"
+        try:
+            yield dirname, basename, int(subject), visit
+        except ValueError:
+            print(fn)
+            exit()
 
  
 def read_remap_table(remap_fn, reverse):
@@ -58,7 +79,7 @@ def read_remap_table(remap_fn, reverse):
     """
 
     df = pd.read_csv(remap_fn, index_col=0)
-    d = df.to_dict()["correct_id"]
+    d = df.to_dict()["ind.ratt"]
     if reverse:
         d = {str(v)+k[-3:]: k[0:4] for k, v in d.items()}
     return d
@@ -70,12 +91,13 @@ def main(fastq_files, remap_table, outdir, reverse, link, dryrun):
 
     files = parse_filenames(fastq_files)
     remap_dict = read_remap_table(remap_table, reverse)
-    print(remap_dict)
     for filename in files:
-        subject_visit = filename[2]
+        subject = filename[2]
+        visit = filename[3]
+        subject_visit = "{}_{}".format(subject, visit.lower())
         if subject_visit in remap_dict:
-            new_subject = str(remap_dict[filename[2]])
-            new_fn = new_subject+"_"+filename[3]+filename[1][7:]
+            new_subject = str(remap_dict[subject_visit])
+            new_fn = filename[1][:2]+new_subject+filename[1][5:]
             old_fn = path.join(filename[0], filename[1])
             print(old_fn, " -->", path.join(outdir, new_fn))
             if not dryrun:
