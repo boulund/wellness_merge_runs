@@ -97,7 +97,7 @@ def main(fastq_files, remap_table, outdir, reverse, link, dryrun):
         subject_visit = "{}_{}".format(subject, visit.lower())
         if subject_visit in remap_dict:
             new_subject = str(remap_dict[subject_visit])
-            new_fn = filename[1][:2]+new_subject+filename[1][5:]
+            new_fn = filename[1][:2]+new_subject+filename[1][6:]
             old_fn = path.join(filename[0], filename[1])
             print(old_fn, " -->", path.join(outdir, new_fn))
             if not dryrun:
