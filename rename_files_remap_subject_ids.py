@@ -2,11 +2,13 @@
 __author__ = "Fredrik Boulund"
 __date__ = "2017"
 __doc__ = """Rename V4 sample files according to remap table.""" 
+__version__ = "0.1.1"
 
 
 from sys import argv, exit
-from os import path, rename, mkdir
+from os import path, mkdir
 from collections import namedtuple
+import shutil
 import argparse
 
 import pandas as pd
@@ -29,8 +31,8 @@ def parse_args():
             help="Reverse the mapping [%(default)s].")
     parser.add_argument("-l", "--link", action="store_true",
             help="Create symlinks instead of copying [%(default)s].")
-    parser.add_argument("-d", "--dryrun", action="store_false",
-            help="Only print planned actions. Don't rename any files [%(default)s].")
+    parser.add_argument("--execute", action="store_true",
+            help="Actually execute file system actions. Default is to only print planned actions [%(default)s].")
 
     if len(argv) < 2:
         parser.print_help()
@@ -70,8 +72,7 @@ def parse_filenames(filenames):
         try:
             yield dirname, basename, int(subject), visit
         except ValueError:
-            print(fn)
-            exit()
+            print("WARNING: Could not parse filename", fn, " -- Ignoring")
 
  
 def read_remap_table(remap_fn, reverse):
@@ -85,8 +86,8 @@ def read_remap_table(remap_fn, reverse):
     return d
 
 
-def main(fastq_files, remap_table, outdir, reverse, link, dryrun):
-    """Process all filenames and rename files according to remap table.
+def main(fastq_files, remap_table, outdir, reverse, link, execute):
+    """Process all filenames and copy files to new filenames according to remap table.
     """
 
     files = parse_filenames(fastq_files)
@@ -100,16 +101,16 @@ def main(fastq_files, remap_table, outdir, reverse, link, dryrun):
             new_fn = filename[1][:2]+new_subject+filename[1][6:]
             old_fn = path.join(filename[0], filename[1])
             print(old_fn, " -->", path.join(outdir, new_fn))
-            if not dryrun:
+            if execute:
                 if link:
                     print("ln -s {} {}".format(old_fn, new_fn))
                 else:
-                    rename(old_fn, path.join(outdir, new_fn))
+                    shutil.copy(old_fn, path.join(outdir, new_fn))
         else:
-            print(filename[1], " --> No change")
+            print(path.join(filename[0], filename[1]), " --> No change")
 
 if __name__ == "__main__":
     options = parse_args()
     if not path.exists(options.outdir):
         mkdir(options.outdir)
-    main(options.FILE, options.remap, options.outdir, options.reverse, options.link, options.dryrun)
+    main(options.FILE, options.remap, options.outdir, options.reverse, options.link, options.execute)
